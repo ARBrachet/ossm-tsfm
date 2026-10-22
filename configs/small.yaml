@@ -1,0 +1,62 @@
+run_name: small_ossm
+seed: 0
+
+model:
+  patch_size: 16
+  d_model: 256
+  n_heads: 4
+  d_ff: 1024
+  n_blocks: 2              # each block = [time, time, variate] attention layers
+  head: ossm               # ossm | mlp
+  d_state: 64
+  d_hidden: null           # OSSM measurement space: null = encoder output e_p, int = ReLU(W e_p) of that width
+  rho_a: 0.9
+  rho_observer: 0.91
+  transition: dense        # dense | modal (stable 2x2 blocks) | selective (modal blocks modulated by e_p)
+  a_cap: null              # dense only: rescale A after each step if its spectral radius exceeds this value
+  observer: free           # free: learned gain L | controlled: L_p = (A_p - M) C^+, error dynamics M for every input
+  selective_bc: false      # control and readout gains depending on e_p: B_p = diag(g_B) B, C_p = C diag(g_C)
+  readout_activation: null # null | relu: decoder input ReLU(C x) instead of C x (innovation stays linear)
+  decoder: mlp             # OSSM quantile decoder D: mlp (residual block, as t0) | linear (a matrix, Eq. 4)
+  mask_correction: true    # m_t = 0 on masked patches (false: correct with every non-padded patch)
+  couple_targets: false    # mean-field coupling between the OSSMs of the targets of a series
+  covariate_pooling: attention   # attention | mean: how B_pk / B_fk read the covariates of a series
+  quantiles: [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
+              0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 0.99]
+
+data:
+  real_dir: data/real
+  kernel_bank: data/synthetic/kernel_synth.npy
+  max_variates: 8
+  cpm_prob: 0.5            # probability of an extra contiguous masked span inside the context
+  cpm_max_patches: 8
+  univariate_sources:      # relative weights inside the univariate pool
+    real: 0.30
+    mixup: 0.15
+    kernel_synth: 0.20
+    tsi: 0.15
+    ets_ar: 0.05
+    ssm: 0.15
+  multivariate_sources:
+    real_multi: 0.15
+    ssm_multi: 0.35
+    multivariatizer: 0.25
+    covariate_effects: 0.25
+
+curriculum:                # phases are applied in order until `until_step`
+  - {until_step: 6000,  window: 512,  max_horizon_patches: 8,  p_multivariate: 0.1}
+  - {until_step: 14000, window: 1024, max_horizon_patches: 16, p_multivariate: 0.2}
+  - {until_step: 20000, window: 2048, max_horizon_patches: 32, p_multivariate: 0.4}
+
+train:
+  steps: 20000
+  tokens_per_batch: 16384  # rows x patches, kept constant across phases
+  lr: 3.0e-4
+  min_lr: 1.0e-5
+  warmup_steps: 1000
+  weight_decay: 0.01
+  grad_clip: 1.0
+  num_workers: 6
+  log_every: 50
+  eval_every: 2000
+  ckpt_dir: checkpoints

@@ -1,0 +1,21 @@
+# produced by the scripts (see README): datasets, training runs, trained weights
+/data/
+/checkpoints/
+/weights/
+*.pt
+
+# logs and third-party results downloaded for comparison
+*.log
+results/gift_eval_reference/
+results/gift_eval_check/
+
+# python and tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
